@@ -1,0 +1,65 @@
+name: Build and deploy JAR app to Azure Web App - api-davinci-insights
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Java version
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'microsoft'
+
+      # Mude para o diretório onde o pom.xml está localizado
+      - name: Build with Maven
+        working-directory: 'Challenge_JavaV.3/insights'
+        run: mvn clean install
+
+      # Verifique os arquivos gerados no diretório target
+      - name: List files in target directory
+        run: ls -la Challenge_JavaV.3/insights/target
+
+      - name: Upload artifact for deployment job
+        uses: actions/upload-artifact@v3
+        with:
+          name: java-app
+          path: 'Challenge_JavaV.3/insights/target/*.jar'
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+    permissions:
+      id-token: write
+  
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v3
+        with:
+          name: java-app
+      
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_C26DBEB5E9094C0E820CCDD289C984E0 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_BB869C055F4C4C519B04F6DBFE9201CB }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_56D7EEB12E544A3CA5BE808223DFAF86 }}
+
+      - name: Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'api-davinci-insights'
+          package: '*.jar'
+          slot-name: 'production'
